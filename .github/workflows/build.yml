@@ -1,0 +1,54 @@
+name: Build RPM and DEB packages
+
+on:
+  push:
+    branches: [ "main" ]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install Build Tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y rpm
+
+      - name: Build RPM
+        run: |
+          mkdir -p ~/rpmbuild/{SOURCES,SPECS}
+          
+          cp scripts/count_files.sh ~/rpmbuild/SOURCES/
+          cp specs/file-counter.spec ~/rpmbuild/SPECS/
+          
+          rpmbuild -bb ~/rpmbuild/SPECS/file-counter.spec
+          
+          cp ~/rpmbuild/RPMS/noarch/*.rpm .
+
+      - name: Build DEB
+        run: |
+          mkdir -p deb-build/DEBIAN
+          mkdir -p deb-build/usr/local/bin
+          
+          cp scripts/count_files.sh deb-build/usr/local/bin/file-counter
+          chmod 755 deb-build/usr/local/bin/file-counter
+
+          echo "Package: file-counter" > deb-build/DEBIAN/control
+          echo "Version: 1.0" >> deb-build/DEBIAN/control
+          echo "Architecture: all" >> deb-build/DEBIAN/control
+          echo "Maintainer: GitHub Action <action@github.com>" >> deb-build/DEBIAN/control
+          echo "Description: Auto-built package" >> deb-build/DEBIAN/control
+          
+          dpkg-deb --build deb-build file-counter_1.0_all.deb
+
+
+      - name: Upload Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: built-packages
+          path: |
+            *.rpm
+            *.deb
